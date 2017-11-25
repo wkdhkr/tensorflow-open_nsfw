@@ -8,14 +8,37 @@ import glob
 import time
 
 from model import OpenNsfwModel, InputType
-from image_utils import create_tensorflow_image_loader
-from image_utils import create_yahoo_image_loader
+from flask import Flask, request, Response, jsonify
 
 import numpy as np
+import json
+
+app = Flask(__name__)
+sess = None
+model = None
+
+@app.route('/')
+def index():
+    return Response(open('./static/getImage.html').read(), mimetype="text/html")
+
+@app.route('/image', methods=['POST'])
+def image():
+    i = request.files['image']
+    data = np.fromstring(i.stream.read(),np.uint8)
+    img = cv2.imdecode(data,cv2.IMREAD_COLOR)
+    network_data = read_image(img)
+    global sess
+    global model
+    predictions = \
+                sess.run(model.predictions,
+                         feed_dict={model.input: network_data})
+    print("Predictions: nsfw ")
+    print (predictions)
+    print type(predictions[0][0].item())
+    result = { "sfw": predictions[0][0].item(), "nsfw": predictions[0][1].item() }
+    return jsonify(result)
 
 
-IMAGE_LOADER_TENSORFLOW = "tensorflow"
-IMAGE_LOADER_YAHOO = "yahoo"
 
 def read_image(image1):
         H,W, _ = image1.shape
@@ -44,17 +67,12 @@ def read_image(image1):
         return image
 
 def main(argv):
+    global sess
+    global model
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("input_file", help="Path to the input image.\
-                        Only jpeg images are supported.")
     parser.add_argument("-m", "--model_weights", required=True,
                         help="Path to trained model weights file")
-
-    parser.add_argument("-l", "--image_loader",
-                        default=IMAGE_LOADER_YAHOO,
-                        help="image loading mechanism",
-                        choices=[IMAGE_LOADER_YAHOO, IMAGE_LOADER_TENSORFLOW])
 
     parser.add_argument("-t", "--input_type",
                         default=InputType.TENSOR.name.lower(),
@@ -65,32 +83,16 @@ def main(argv):
     args = parser.parse_args()
 
     model = OpenNsfwModel()
+    sess = tf.Session()
+    if not(sess):
+        exit(1)
 
-    with tf.Session() as sess:
+    input_type = InputType[args.input_type.upper()]
+    model.build(weights_path=args.model_weights, input_type=input_type)
+    sess.run(tf.global_variables_initializer())
+    print("Session  initialized. Running flask")
+    app.run(debug=True, host='0.0.0.0')
 
-        input_type = InputType[args.input_type.upper()]
-        model.build(weights_path=args.model_weights, input_type=input_type)
-
-        fn_load_image = None
-        for myfile in glob.glob(args.input_file+'/*.jpg'):
-            start_time = time.time()
-            image1 = cv2.imread(myfile)
-
-            image = read_image(image1)
-
-            sess.run(tf.global_variables_initializer())
-
-
-
-            predictions = \
-                sess.run(model.predictions,
-                         feed_dict={model.input: image})
-            end_time =time.time()
-
-            print("Results for '{}'".format(myfile))
-            print("\tSFW score:\t{}\n\tNSFW score:\t{}".format(*predictions[0]))
-            print("Run time {}".format(end_time-start_time))
-            print("")
 
 if __name__ == "__main__":
     main(sys.argv)
