@@ -43,13 +43,13 @@
         let formdata = new FormData();
         formdata.append("image", file);
         let xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:5000/image', true);
+        xhr.open('POST', document.location.href+'/image', true);
         xhr.onload = function () {
             if (this.status === 200)
             {   
                 var res = JSON.parse(this.response);
                 progress = document.getElementById("myBar");
-                progress.style.width=(res.nsfw*1000)+'%';
+                progress.style.width=(res.nsfw*100)+'%';
                 console.log(res.nsfw*1000);
                 setTimeout(sendImagefromCanvas,200);
             }
