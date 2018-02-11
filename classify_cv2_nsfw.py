@@ -17,54 +17,57 @@ app = Flask(__name__)
 sess = None
 model = None
 
+
 @app.route('/')
 def index():
     return Response(open('./static/getImage.html').read(), mimetype="text/html")
 
+
 @app.route('/image', methods=['POST'])
 def image():
     i = request.files['image']
-    data = np.fromstring(i.stream.read(),np.uint8)
-    img = cv2.imdecode(data,cv2.IMREAD_COLOR)
+    data = np.fromstring(i.stream.read(), np.uint8)
+    img = cv2.imdecode(data, cv2.IMREAD_COLOR)
     network_data = read_image(img)
     global sess
     global model
     predictions = \
-                sess.run(model.predictions,
-                         feed_dict={model.input: network_data})
+        sess.run(model.predictions,
+                 feed_dict={model.input: network_data})
     print("Predictions: nsfw ")
-    print (predictions)
-    print type(predictions[0][0].item())
-    result = { "sfw": predictions[0][0].item(), "nsfw": predictions[0][1].item() }
+    print(predictions)
+    print(type(predictions[0][0].item()))
+    result = {"sfw": predictions[0]
+              [0].item(), "nsfw": predictions[0][1].item()}
     return jsonify(result)
 
 
-
 def read_image(image1):
-        H,W, _ = image1.shape
-        if(W>H):
-            x_off = (W-H)//2
-            image1 = image1[:,x_off:x_off+H,:]
-        elif(H<W):
-            y_off = (H-W)//2
-            image1 = image1[y_off:y_off+W,:,:]
-        
-        image1 = cv2.resize(image1,(256,256))
+    H, W, _ = image1.shape
+    if(W > H):
+        x_off = (W-H)//2
+        image1 = image1[:, x_off:x_off+H, :]
+    elif(H < W):
+        y_off = (H-W)//2
+        image1 = image1[y_off:y_off+W, :, :]
 
-        H, W, _ = image1.shape
-        h, w = (224, 224)
+    image1 = cv2.resize(image1, (256, 256))
 
-        h_off = max((H - h) // 2, 0)
-        w_off = max((W - w) // 2, 0)
-        image = image1[h_off:h_off + h, w_off:w_off + w, :]
+    H, W, _ = image1.shape
+    h, w = (224, 224)
 
-        image = image.astype(np.float32, copy=False)
+    h_off = max((H - h) // 2, 0)
+    w_off = max((W - w) // 2, 0)
+    image = image1[h_off:h_off + h, w_off:w_off + w, :]
 
-        VGG_MEAN = [104, 117, 123]
-        image -= np.array(VGG_MEAN, dtype=np.float32)
+    image = image.astype(np.float32, copy=False)
 
-        image = np.expand_dims(image,axis=0)
-        return image
+    VGG_MEAN = [104, 117, 123]
+    image -= np.array(VGG_MEAN, dtype=np.float32)
+
+    image = np.expand_dims(image, axis=0)
+    return image
+
 
 def main(argv):
     global sess
@@ -83,7 +86,11 @@ def main(argv):
     args = parser.parse_args()
 
     model = OpenNsfwModel()
-    sess = tf.Session()
+    gpuConfig = tf.ConfigProto(
+        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.5),
+        device_count={'GPU': 1}
+    )
+    sess = tf.Session(config=gpuConfig)
     if not(sess):
         exit(1)
 
