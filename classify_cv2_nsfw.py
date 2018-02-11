@@ -87,7 +87,7 @@ def main(argv):
 
     model = OpenNsfwModel()
     gpuConfig = tf.ConfigProto(
-        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.5),
+        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.3),
         device_count={'GPU': 1}
     )
     sess = tf.Session(config=gpuConfig)
