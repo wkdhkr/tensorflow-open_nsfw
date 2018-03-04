@@ -98,7 +98,7 @@ def main(argv):
     model.build(weights_path=args.model_weights, input_type=input_type)
     sess.run(tf.global_variables_initializer())
     print("Session  initialized. Running flask")
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=False, host='0.0.0.0')
 
 
 if __name__ == "__main__":
