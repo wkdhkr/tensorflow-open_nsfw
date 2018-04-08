@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import glob
 import time
+import socket
 
 from model import OpenNsfwModel, InputType
 from flask import Flask, request, Response, jsonify
@@ -17,6 +18,19 @@ app = Flask(__name__)
 sess = None
 model = None
 
+def is_used_port(port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(('127.0.0.1', port))
+
+    if result == 0:
+       return True
+    else:
+        return False
+
+def detect_port(port):
+    if not is_used_port(port):
+        return port
+    return detect_port(port + 1)
 
 @app.route('/')
 def index():
@@ -34,8 +48,8 @@ def image():
     predictions = \
         sess.run(model.predictions,
                  feed_dict={model.input: network_data})
-    print("Predictions: nsfw ")
-    print(predictions)
+    #print("Predictions: nsfw ")
+    #print(predictions)
     print(type(predictions[0][0].item()))
     result = {"sfw": predictions[0]
               [0].item(), "nsfw": predictions[0][1].item()}
@@ -83,6 +97,8 @@ def main(argv):
                         choices=[InputType.TENSOR.name.lower(),
                                  InputType.BASE64_JPEG.name.lower()])
 
+    parser.add_argument("-p", "--port", default=6000, help="port number")
+
     args = parser.parse_args()
 
     model = OpenNsfwModel()
@@ -98,7 +114,8 @@ def main(argv):
     model.build(weights_path=args.model_weights, input_type=input_type)
     sess.run(tf.global_variables_initializer())
     print("Session  initialized. Running flask")
-    app.run(debug=False, host='0.0.0.0')
+    port = detect_port(int(args.port))
+    app.run(debug=False, host='0.0.0.0', port=port)
 
 
 if __name__ == "__main__":
